@@ -3,13 +3,13 @@ import os
 import streamlit as st
 import pandas as pd
 
-# Umożliwia imporotwanie modułów gdy odpalamy apkę bezpośrednio z dashboard/app.py
+# Allow importing modules when running directly from dashboard/app.py
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
 from engine.ranker import run_ranking
 
-# Konfiguracja UI
+# UI Configuration
 st.set_page_config(
     page_title="Target Prioritization Engine",
     page_icon="🧬",
@@ -18,30 +18,30 @@ st.set_page_config(
 
 st.title("🧬 Target Prioritization Engine")
 st.markdown("""
-Aplikacja agreguje dowody z **Open Targets**, literatury (**Europe PMC**) oraz poziomów ekspresji (**NCBI GEO**). 
-Wyznacza ogólny *Priority Score* dla celów terapeutycznych wybranej choroby.
+This application aggregates evidence from **Open Targets**, literature (**Europe PMC**), and expression levels (**NCBI GEO**). 
+It calculates an overall *Priority Score* for therapeutic targets related to a selected disease.
 """)
 
-st.sidebar.header("Ustawienia Analizy")
-efo_id = st.sidebar.text_input("Podaj Open Targets EFO ID:", value="EFO_0000676")
-st.sidebar.caption("Przykłady: EFO_0000676 (Asthma), EFO_0000249 (Alzheimer's disease)")
+st.sidebar.header("Analysis Settings")
+efo_id = st.sidebar.text_input("Enter Open Targets EFO ID:", value="EFO_0000676")
+st.sidebar.caption("Examples: EFO_0000676 (Asthma), EFO_0000249 (Alzheimer's disease)")
 
-top_n = st.sidebar.slider("Liczba celów do analizy (API limit):", min_value=5, max_value=50, value=15)
+top_n = st.sidebar.slider("Number of targets to analyze (API limit):", min_value=5, max_value=50, value=15)
 
-if st.sidebar.button("Uruchom Silnik 🚀"):
-    with st.spinner(f"Pobieranie i agregacja danych z wielu baz dla chorby: {efo_id}... (To może potrwać dłuższą chwilę)"):
+if st.sidebar.button("Run Engine 🚀"):
+    with st.spinner(f"Fetching and aggregating data from multiple databases for disease: {efo_id}... (This might take a moment)"):
         try:
             df = run_ranking(efo_id, limit=top_n)
             
             if df.empty:
-                st.error("Nie znaleziono wyników dla zadanego EFO ID.")
+                st.error("No results found for the provided EFO ID.")
             else:
-                st.success("Dane załadowane i przeliczone pomyślnie!")
+                st.success("Data successfully loaded and processed!")
                 
-                # Warstwa 1: DataFrame (Ranking główny)
-                st.subheader("🏆 Tabela Rankingowa")
+                # Layer 1: DataFrame (Main Ranking)
+                st.subheader("🏆 Ranking Table")
                 
-                # Wyświetlamy schludnie
+                # Neatly display the table
                 display_cols = ['symbol', 'name', 'priority_score', 'ot_norm', 'epmc_norm', 'geo_norm', 'epmc_hits_raw']
                 st.dataframe(
                     df[display_cols].style.background_gradient(cmap='viridis', subset=['priority_score']),
@@ -50,15 +50,15 @@ if st.sidebar.button("Uruchom Silnik 🚀"):
                 
                 st.divider()
                 
-                # Warstwa 2: Evidence Cards (Explainability)
-                st.subheader("🔬 Karta Dowodów (Evidence Cards)")
-                st.markdown("Poniżej znajdziesz dowody składowe, pokazujące dlaczego dany target znalazł się tak wysoko.")
+                # Layer 2: Evidence Cards (Explainability)
+                st.subheader("🔬 Evidence Cards")
+                st.markdown("Below you will find the constituent evidence explaining why a given target ranked so high.")
                 
                 cols = st.columns(3)
-                for index, row in df.head(6).iterrows(): # Wyświetlamy max. pierwszych 6 jako karty
+                for index, row in df.head(6).iterrows(): # Display max 6 cards
                     col = cols[index % 3]
                     with col:
-                        # Karta wizualna
+                        # Visual card
                         score_proc = int(row['priority_score'] * 100)
                         st.markdown(f"### {row['symbol']}")
                         st.markdown(f"**{row['name']}**")
@@ -66,23 +66,23 @@ if st.sidebar.button("Uruchom Silnik 🚀"):
                         
                         st.write("---")
                         st.write(f"🧬 **Open Targets Score**: `{row['ot_norm']:.3f}`")
-                        st.write(f"📚 **Literatura (EPMC)**: `{row['epmc_hits_raw']}` wystąpień *(norm: {row['epmc_norm']:.2f})*")
-                        st.write(f"📊 **Ekspresja (GEO)**: `{row['geo_hits_raw']}` datasetów *(norm: {row['geo_norm']:.2f})*")
+                        st.write(f"📚 **Literature (EPMC)**: `{row['epmc_hits_raw']}` hits *(norm: {row['epmc_norm']:.2f})*")
+                        st.write(f"📊 **Expression (GEO)**: `{row['geo_hits_raw']}` datasets *(norm: {row['geo_norm']:.2f})*")
                         st.write("")
                         
-                # Funkcjonalność eksportu "decision-ready report"
+                # Export functionality "decision-ready report"
                 st.divider()
-                st.subheader("📥 Eksport Wyników")
+                st.subheader("📥 Export Results")
                 
                 csv = df.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="Pobierz pełny raport CSV",
+                    label="Download full CSV report",
                     data=csv,
                     file_name=f'ranking_targets_{efo_id}.csv',
                     mime='text/csv',
                 )
                 
         except Exception as e:
-            st.error(f"Wystąpił nieoczekiwany błąd: {e}")
+            st.error(f"An unexpected error occurred: {e}")
 else:
-    st.info("👈 Wpisz EFO ID i kliknij 'Uruchom Silnik', aby zbadać cele terapeutyczne.")
+    st.info("👈 Enter an EFO ID and click 'Run Engine' to explore therapeutic targets.")
